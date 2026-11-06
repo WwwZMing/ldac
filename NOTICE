@@ -1,0 +1,15 @@
+LDAC A2DP for Windows
+Copyright 2026 WwwZMing
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes software developed by Sony Corporation
+(libldac, https://android.googlesource.com/platform/external/libldac,
+ licensed under the Apache License, Version 2.0).
+
+This product includes software developed by Broadcom Corporation /
+Google Inc. (SBC encoder from the Android Open Source Project,
+ licensed under the Apache License, Version 2.0).
+
+Code and documentation were written by DeepSeek (DeepSeek Harness agent)
+under the direction of the repository author.

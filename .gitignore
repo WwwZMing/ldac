@@ -1,0 +1,40 @@
+# ---- 构建产物 ----
+bin-*/
+obj-*/
+target/
+symbols/
+*.obj
+*.exe
+*.pdb
+*.ilk
+
+# ---- 日志 / 调试 / 实验产物 ----
+log/
+.push/
+*.log
+*.etl
+*.cab
+*.dmp
+
+# ---- 本机路径 / AI 草稿 ----
+memory/
+.workbuddy/
+.kd*.log
+
+# ---- 编辑器 / VS ----
+.vs/
+*.user
+*.suo
+Thumbs.db
+Desktop.ini
+
+# ---- 私有证书（自签名私钥绝不入库）----
+*.pfx
+*.pvk
+*.pvk2
+
+# ---- 外部参考（在 C:\Developer\_reference）----
+ref/
+
+# ---- 对他人二进制的逆向笔记（只留本地，不公开）----
+docs/notes/
