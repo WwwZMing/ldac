@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{7A4E2F61-93C5-4B8D-A1D0-2E6F8C9B3A74}</ProjectGuid>
+    <RootNamespace>ldacsend</RootNamespace>
+    <ProjectName>ldac-send</ProjectName>
+    <WindowsTargetPlatformVersion>10.0.28000.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset Condition="'$(DefaultPlatformToolset)'!=''">$(DefaultPlatformToolset)</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <WholeProgramOptimization Condition="'$(Configuration)'=='Release'">true</WholeProgramOptimization>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <PropertyGroup>
+    <OutDir>$(MSBuildProjectDirectory)\..\bin-host\$(Configuration)\</OutDir>
+    <IntDir>$(MSBuildProjectDirectory)\..\obj-host\$(Configuration)\</IntDir>
+    <TargetName>ldac-send</TargetName>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>
+        $(ProjectDir)..\common;
+        $(ProjectDir)..\third_party\compat;
+        $(ProjectDir)..\third_party\libldac\inc;
+        $(ProjectDir)..\third_party\libldac\src;
+        $(ProjectDir)..\third_party\aosp-sbc;
+        %(AdditionalIncludeDirectories)
+      </AdditionalIncludeDirectories>
+      <!-- libldac 是 GCC 风格源码，强制包含兼容层消掉 __attribute__ 等 -->
+      <ForcedIncludeFiles>$(ProjectDir)..\third_party\compat\msvc_compat.h</ForcedIncludeFiles>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <!-- 必须用**发布版** CRT：客户机（tiny11/VM）上没有 VCRUNTIME140D.dll 与
+           ucrtbased.dll，Debug 配置（/MDd）编出来的 exe 在那个系统上加载即失败，
+           连 usage 都打不出来、退出码为空。旧的那个 exe 是 /MD 编的，所以一直没暴露。 -->
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <!-- mfplat MFCreateMediaType/MFCreateSample/MFTEnumEx，mfuuid 的 GUID，
+           mfreadwrite 不需要（我们自己推 MFT） -->
+      <AdditionalDependencies>ole32.lib;mfplat.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClCompile Include="ldac_send.c" />
+    <!-- libldac 以源码 vendor：C 部分 + 封装层一起编进 exe -->
+    <ClCompile Include="..\third_party\libldac\src\ldaclib.c">
+      <PreprocessorDefinitions>_32BIT_FIXED_POINT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <AdditionalOptions>/D"__attribute__(x)=" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="..\third_party\libldac\src\ldacBT.c">
+      <PreprocessorDefinitions>_32BIT_FIXED_POINT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="wasapi_loop.cpp" />
+    <!-- AAC：MF 的 AAC 编码器 + 自己写的 LATM 封帧（C++，因为要 COM） -->
+    <ClCompile Include="aac_latm.cpp" />
+    <!-- AOSP bluedroid 的 SBC 编码器（Apache-2.0），只用于 SBC 对照实验 -->
+    <ClCompile Include="..\third_party\aosp-sbc\sbc_analysis.c">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="..\third_party\aosp-sbc\sbc_dct.c">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="..\third_party\aosp-sbc\sbc_dct_coeffs.c">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="..\third_party\aosp-sbc\sbc_enc_bit_alloc_mono.c">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="..\third_party\aosp-sbc\sbc_enc_bit_alloc_ste.c">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="..\third_party\aosp-sbc\sbc_enc_coeffs.c">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="..\third_party\aosp-sbc\sbc_encoder.c">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+    <ClCompile Include="..\third_party\aosp-sbc\sbc_packing.c">
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+    </ClCompile>
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

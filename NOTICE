@@ -1,0 +1,35 @@
+LDAC A2DP for Windows
+Copyright 2026 WwwZMing
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+=== 随本项目分发的第三方代码 ===
+
+Sony Corporation
+  libldac — LDAC 编码器
+  https://android.googlesource.com/platform/external/libldac
+  Apache License 2.0
+
+Broadcom Corporation / Google Inc.
+  SBC encoder from the Android Open Source Project (AOSP bluedroid)
+  https://android.googlesource.com/platform/system/bt
+  Apache License 2.0
+
+=== 使用但未随本项目分发的系统组件 ===
+
+Microsoft Windows Media Foundation
+  AAC 编码器（MFT，MFAudioFormat_AAC）
+  由操作系统提供，本项目不打包、不修改。
+
+=== 实现说明 ===
+
+- A2DP 的 AAC 负载封帧（LATM AudioMuxElement）为本项目自行实现，未使用
+  fdk-aac 等第三方 LATM 复用器。
+- AVDTP / RTP 打包格式参考 A2DP 规范与开源实现
+  （A2DP-Windows-Bridge, https://github.com/SeiyaFunaokaJP/A2DP-Windows-Bridge），
+  未包含其代码。
+
+=== 作者与工具 ===
+
+代码与文档由 DeepSeek（DeepSeek Harness 智能体）在仓库作者指导下编写；
+需求、取舍与全部上机实验由作者负责。

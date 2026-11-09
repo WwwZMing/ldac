@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LdacPanel.LogWindow"
+        Title="LDAC driver log"
+        Width="1000" Height="640" MinWidth="640" MinHeight="360"
+        Background="#0E1116">
+  <Grid RowDefinitions="Auto,*" Margin="12">
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+      <CheckBox x:Name="Follow" Content="跟随" IsChecked="True" Foreground="#D6DCE8" VerticalAlignment="Center"/>
+      <Button x:Name="ClearBtn" Grid.Column="1" Content="清屏" Margin="14,0,0,0"/>
+      <TextBlock x:Name="PathText" Grid.Column="2" Margin="14,0,0,0"
+                 Foreground="#5B6472" FontSize="11" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis"/>
+      <TextBlock x:Name="CountText" Grid.Column="3" Foreground="#5B6472" FontSize="11"
+                 VerticalAlignment="Center"/>
+    </Grid>
+
+    <TextBox x:Name="View" Grid.Row="1" Margin="0,10,0,0"
+             IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+             FontFamily="Consolas,Menlo,monospace" FontSize="12"
+             Background="#0B0E13" Foreground="#D6DCE8" BorderThickness="0"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"
+             ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+  </Grid>
+</Window>

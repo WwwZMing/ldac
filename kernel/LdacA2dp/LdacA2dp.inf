@@ -1,0 +1,72 @@
+; ============================================================================
+;  LdacA2dp.inf - LDAC A2DP: PortCls audio endpoint + AVDTP/L2CAP channel
+; ============================================================================
+;  ALL COMMENTS ARE ASCII-ONLY ON PURPOSE.
+;  An INF without a BOM is parsed as ANSI (CP936 on zh-CN). Multi-byte UTF-8
+;  merges physical lines and section headers vanish.
+;
+;  2026-11-02 rev 1.1.0.0 -- PortCls endpoint grafted on top of the BT channel:
+;    - keeps the original job (AVDTP signaling + ACL forwarding), but now ALSO
+;      creates a real KS audio endpoint. Replacing btha2dp used to remove the
+;      only thing that made the headphone show up in the audio stack, which is
+;      why "pairing success" never arrived: there was no endpoint at all.
+;    - the driver is WDM, not KMDF: PortCls wants the raw DRIVER_OBJECT
+;      dispatch table (PcInitializeAdapterDriver); KMDF would grab it.
+;
+;  Hardware IDs:
+;    - host: Intel radio, the A2DP child reports the VID/PID form
+;    - VM:   VMware virtual bluetooth, reports the LOCALMFG&1966 form
+;
+;  NOTE: there used to be a third entry "ROOT\LdacA2dp" for isolated testing.
+;  It was removed because pnputil /install then bound the driver to a leftover
+;  root device too, giving the driver TWO instances. g_LdacBthPdo is a single
+;  global, so the root instance overwrote the BTHENUM PDO and every BRB query
+;  failed with 0xC00000BB. Isolated endpoint testing is covered by the VS toy.
+; ============================================================================
+
+[Version]
+Signature      = "$WINDOWS NT$"
+Class          = MEDIA
+ClassGUID      = {4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider       = %Provider%
+CatalogFile    = LdacA2dp.cat
+PnpLockdown    = 1
+DriverVer      = 11/02/2026,1.2.0.0
+
+[DestinationDirs]
+LdacA2dp.CopyFiles = 12
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+LdacA2dp.sys = 1,,
+
+[Manufacturer]
+%Provider% = AbuLabs,NTamd64.10.0...22000
+
+[AbuLabs.NTamd64.10.0...22000]
+%DeviceDesc% = LdacA2dp_Install, BTHENUM\{0000110b-0000-1000-8000-00805f9b34fb}_VID&000105d6_PID&000a
+%DeviceDesc% = LdacA2dp_Install, BTHENUM\{0000110b-0000-1000-8000-00805f9b34fb}_LOCALMFG&1966
+
+[LdacA2dp_Install.NT]
+CopyFiles = LdacA2dp.CopyFiles
+
+[LdacA2dp_Install.NT.Services]
+AddService = LdacA2dp, 0x00000002, LdacA2dp_Service
+
+[LdacA2dp_Service]
+DisplayName   = %ServiceDesc%
+ServiceType   = 1
+StartType     = 3
+ErrorControl  = 1
+ServiceBinary = %12%\LdacA2dp.sys
+
+[LdacA2dp.CopyFiles]
+LdacA2dp.sys,,,0x100
+
+[Strings]
+Provider    = "Abu Labs"
+DeviceDesc  = "LDAC A2DP Audio (Abu)"
+ServiceDesc = "LDAC A2DP Driver"
+DiskName    = "LDAC A2DP Driver"

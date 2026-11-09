@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{B2E4C0A1-5F3D-4E77-9A11-3D6C2B8E4F01}</ProjectGuid>
+    <RootNamespace>LdacA2dp</RootNamespace>
+    <ProjectName>LdacA2dp</ProjectName>
+    <!-- 本机 SDK/WDK 都是 10.0.28000.0 -->
+    <WindowsTargetPlatformVersion>10.0.28000.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Driver</ConfigurationType>
+    <!-- WDM，不是 KMDF：PortCls 的入口是 PcInitializeAdapterDriver，
+         它要的是裸 DRIVER_OBJECT 派发表（见 Driver.c），KMDF 会把它抢走。 -->
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <WholeProgramOptimization Condition="'$(Configuration)'=='Release'">true</WholeProgramOptimization>
+    <SpectreMitigation>false</SpectreMitigation>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <PropertyGroup>
+    <OutDir>$(MSBuildProjectDirectory)\..\..\bin-a2dp\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(MSBuildProjectDirectory)\..\..\obj-a2dp\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>LdacA2dp</TargetName>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <ExceptionHandling>false</ExceptionHandling>
+      <PreprocessorDefinitions>_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(MSBuildProjectDirectory)\..\..\common;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- 源码是 UTF-8 无 BOM 且含中文注释。cl 默认按 CP936 读，中文的 UTF-8 字节
+           会被拼出 0x5C，让 // 注释续行吞掉下一行声明（表现为莫名的 C2061/C2065）。 -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+    </ClCompile>
+    <Link>
+      <!-- PortCls 不在默认链接集里，必须显式加（tm 的 toy 一样要） -->
+      <AdditionalDependencies>%(AdditionalDependencies);portcls.lib;Wdmsec.lib;aux_klib.lib</AdditionalDependencies>
+    </Link>
+    <DriverSign>
+      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+      <SignMode>TestSign</SignMode>
+    </DriverSign>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <!-- 音频端点（PortCls）+ BT 编排（AVDTP/L2CAP） -->
+    <ClCompile Include="Driver.cpp" />
+    <ClCompile Include="KsAdapter.cpp" />
+    <ClCompile Include="MiniportWaveRT.cpp" />
+    <ClCompile Include="MiniportTopology.cpp" />
+    <ClCompile Include="CUnknown.cpp" />
+    <ClCompile Include="BthL2cap.cpp" />
+    <ClCompile Include="Avdtp.c" />
+    <ClCompile Include="Log.c" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 钉死过去日期：盖公章用本地时间、inf2cat 用 UTC 校验，本地凌晨 0-8 点
+         会被判 22.9.7 "DriverVer in the future"。版本号仍自动递增。 -->
+    <Inf Include="LdacA2dp.inf">
+      <SpecifyDriverVerDirectiveDate>true</SpecifyDriverVerDirectiveDate>
+      <DateStamp>01/01/2026</DateStamp>
+    </Inf>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FilesToPackage Include="$(TargetPath)">
+      <PackageFile>$(TargetName).sys</PackageFile>
+    </FilesToPackage>
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
