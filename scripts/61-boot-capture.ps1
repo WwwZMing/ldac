@@ -53,18 +53,27 @@ if ($alive.Count -eq 0) { Say 'all captures empty after retries; abort'; exit 1 
 Say "capture_alive=$($alive | ForEach-Object { $_.N } | Join-String -Separator ',') retry=$try"
 
 $mon = Join-Path $OutDir "$stamp-monitor.txt"
-'sec state pkt peak pps kbps' | Out-File $mon
+'sec state pkt peak pps kbps cpu sndcpu' | Out-File $mon
 $apiOk = $false
+$prevSnd = 0
 for ($i = 0; $i -lt $Seconds; $i++) {
-    $line = "$i - - - - -"
+    $line = "$i - - - - - - -"
+    $cpu = -1
+    try { $cpu = (Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'" -EA 0).PercentProcessorTime } catch { }
+    $snd = 0
+    $sp = Get-Process ldac-send -EA 0 | Select-Object -First 1
+    if ($sp) { $snd = [math]::Round($sp.TotalProcessorTime.TotalMilliseconds); }
+    $sndD = 0
+    if ($prevSnd -gt 0 -and $snd -ge $prevSnd) { $sndD = $snd - $prevSnd }
+    $prevSnd = $snd
     try {
         $c = New-Object System.Net.Sockets.TcpClient('127.0.0.1', 48620)
         $s = $c.GetStream(); $w = New-Object IO.StreamWriter($s); $r = New-Object IO.StreamReader($s)
         $w.WriteLine('status'); $w.Flush(); $j = $r.ReadLine(); $c.Close()
         $o = $j | ConvertFrom-Json
         if (-not $apiOk) { $apiOk = $true; Say "api_first_at_sec=$i" }
-        $line = "{0} {1} {2} {3} {4:N1} {5:N0}" -f $i, $o.status.state, $o.status.packets, $o.status.peak, $o.status.pps, $o.status.kbps
-    } catch { }
+        $line = "{0} {1} {2} {3} {4:N1} {5:N0} {6} {7}" -f $i, $o.status.state, $o.status.packets, $o.status.peak, $o.status.pps, $o.status.kbps, $cpu, $sndD
+    } catch { $line = "$i - - - - - $cpu $sndD" }
     $line | Out-File $mon -Append
     Start-Sleep -Seconds 1
 }

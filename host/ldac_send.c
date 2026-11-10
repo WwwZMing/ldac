@@ -24,7 +24,9 @@
 
 #include "../common/ldac_io.h"
 #include <mmsystem.h>
+#include <avrt.h>
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "avrt.lib")
 #include "ldacBT.h"
 #include "sbc_encoder.h"        // AOSP bluedroid SBC 编码器（--codec sbc 对照实验用）
 #include "aac_latm.h"           // AAC-LC（MF 编码器）+ LATM 封帧（--codec aac）
@@ -268,6 +270,24 @@ static volatile LONG  g_CapStop = 0;
 static WasapiCap*     g_CapObj = NULL;
 
 static volatile LONG  g_CapSilence = 0;   // 采集断流期间补进去的静音字节（诊断）
+static volatile LONG  g_GapMaxUs  = 0;    // 最近 100 包里最大的发包间隔（诊断，微秒）
+static LONGLONG       g_ProgStartMs = 0;  // 进程启动的 tick，用于日志时间轴
+
+//  音频线程提权：MMCSS「Pro Audio」比单纯 SetThreadPriority 稳 ——
+//  它给的是"实时优先级 + 调度配额"，开机时那一堆后台任务抢不走。
+//  MMCSS 失败就退到 HIGHEST，至少比默认高。
+static void BoostAudioThread(const wchar_t* name)
+{
+    DWORD task = 0;
+    HANDLE h = AvSetMmThreadCharacteristicsW((LPWSTR)name, &task);
+    if (h) {
+        AvSetMmThreadPriority(h, AVRT_PRIORITY_CRITICAL);
+        printf("mmcss: '%ls' ok (task=%lu)\n", name, (unsigned long)task);
+        return;
+    }
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+    printf("mmcss: '%ls' failed (%lu), fallback HIGHEST\n", name, (unsigned long)GetLastError());
+}
 static int            g_CapFreq = 48000;  // 采集流采样率（补静音换算用）
 static int            g_CapAlign = 4;     // 采集流 block align
 
@@ -277,6 +297,7 @@ static int            g_CapAlign = 4;     // 采集流 block align
 static DWORD WINAPI CapThread(LPVOID p)
 {
     static unsigned char buf[8192];
+    BoostAudioThread(L"Pro Audio");
     LARGE_INTEGER qpf, t0, now;
     long long written = 0, lag;
     (void)p;
@@ -374,6 +395,8 @@ static DWORD WINAPI SenderThread(LPVOID p)
 {
     RtpSender* r = (RtpSender*)p;
     long long  samples = 0;
+    LONGLONG   lastSendQpc = 0;
+    BoostAudioThread(L"Pro Audio");
 
     while (!g_QStop)
     {
@@ -418,6 +441,17 @@ static DWORD WINAPI SenderThread(LPVOID p)
                 continue;
             }
             InterlockedIncrement(&g_SentOk);
+            //  发包间隔诊断：把最近 100 包里的最大值记下来，日志里能看到
+            //  "被调度挤开" 与 "队列空等" 的差别（值就是最坏一次的间隔）。
+            {
+                LARGE_INTEGER tsn;
+                QueryPerformanceCounter(&tsn);
+                if (lastSendQpc) {
+                    long long us = (tsn.QuadPart - lastSendQpc) * 1000000 / r->Qpf;
+                    if (us > g_GapMaxUs) g_GapMaxUs = (LONG)us;
+                }
+                lastSendQpc = tsn.QuadPart;
+            }
             if (r->Fails > 0) {
                 LARGE_INTEGER now2;
                 QueryPerformanceCounter(&now2);
@@ -465,9 +499,11 @@ static void RtpFlush(RtpSender* r)
     //  （RTP 负载 01 FC 00 00 ... vs 我编的 47 FC 00 00 ...）。
 
     if ((r->PacketsSent % 100) == 0) {
-        LogNote("[pkt %lld] peak=%d frames=%d len=%d fill=%ld\n",
+        LogNote("[pkt %lld] peak=%d frames=%d len=%d fill=%ld t=%lld gap=%ld\n",
                 (long long)r->PacketsSent, r->LastPeak, r->Frames, r->Len,
-                (long)g_CapSilence);
+                (long)g_CapSilence,
+                (long long)(GetTickCount64() - (ULONGLONG)g_ProgStartMs),
+                (long)InterlockedExchange(&g_GapMaxUs, 0));
     }
     QueuePut(r);            // 交给发送线程，绝不在编码循环里阻塞
 
@@ -850,6 +886,7 @@ int main(int argc, char** argv)
     //  Windows 默认定时器精度 15.6ms，Sleep(1) 实际会睡到 15ms —— 节拍器
     //  一旦睡过头就是"一卡一卡"。抬到 1ms 精度。
     timeBeginPeriod(1);
+    g_ProgStartMs = (LONGLONG)GetTickCount64();
     //  启动预缓冲：先攒 150ms 音频再开始发，吸收开头的抓取抖动
     if (!wavMode && !latmMode) {
         long long need = (long long)freq * 2 * (capBits / 8) * 150 / 1000;
@@ -866,6 +903,7 @@ int main(int argc, char** argv)
     snd.T0 = t0.QuadPart;
     snd.Freq = freq;
     CreateThread(NULL, 0, SenderThread, &snd, 0, NULL);   // 独立发送线程
+    BoostAudioThread(L"Pro Audio");                        // 编码循环跑在主线程
 
     if (wavMode) {
         printf("streaming %.1f s of audio ...\n",
