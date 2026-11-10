@@ -19,6 +19,7 @@ internal sealed class LdacService : ServiceBase
 
     protected override void OnStart(string[] args)
     {
+        PanelLog.Banner("service");
         PanelLog.Write("service: starting");
         _core = new Core();
         _core.Start();

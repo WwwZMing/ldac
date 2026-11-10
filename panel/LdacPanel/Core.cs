@@ -41,6 +41,7 @@ internal sealed class Core
             //  服务起来前可能留着上一代的孤儿（服务被强杀时子进程不会跟着死）。
             //  发送端有全局单实例互斥，孤儿在 = 新进程秒退，所以必须先清干净。
             KillStraySenders();
+            RotateSenderLog();
 
             _sender.LogPath = SenderLogPath;
             var args = $"--loopback --match LDAC --codec {EffectiveCodec()} --log \"{SenderLogPath}\" --eqmid {Aeqmid()}";
@@ -85,6 +86,31 @@ internal sealed class Core
             return name;
         }
         return _codec;
+    }
+
+    /// <summary>
+    /// 把上一代 sender.log 改名留档再起新进程：发送端自己用 fopen("w") 打开日志，
+    /// 不轮转的话上一次崩溃/重连的记录会被直接截断，事后无从对照。只留最近 10 份。
+    /// </summary>
+    private void RotateSenderLog()
+    {
+        try
+        {
+            var path = SenderLogPath;
+            if (!System.IO.File.Exists(path)) return;
+            if (new System.IO.FileInfo(path).Length == 0) return;
+            var dir = System.IO.Path.GetDirectoryName(path) ?? "C:\\ProgramData\\LdacPanel";
+            var stem = System.IO.Path.GetFileNameWithoutExtension(path);
+            var dst = System.IO.Path.Combine(dir, $"{stem}-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+            System.IO.File.Move(path, dst, true);
+            var files = new System.IO.DirectoryInfo(dir).GetFiles($"{stem}-*.log");
+            Array.Sort(files, (a, b) => b.LastWriteTime.CompareTo(a.LastWriteTime));
+            for (var i = 10; i < files.Length; i++) files[i].Delete();
+        }
+        catch (Exception ex)
+        {
+            PanelLog.Write($"core: rotate sender log failed: {ex.Message}");
+        }
     }
 
     private static void KillStraySenders()
@@ -237,6 +263,7 @@ internal sealed class Core
     }
 
     private static bool? _switchLogged;
+    private int _lastLoggedState = -1;
 
     private void Supervise()
     {
@@ -247,6 +274,12 @@ internal sealed class Core
         {
             //  驱动不在（未装/设备已移除）：什么都不做，等它回来。
             return;
+        }
+
+        if (st.Value.State != _lastLoggedState)
+        {
+            PanelLog.Write($"supervisor: state {_lastLoggedState} -> {st.Value.State}");
+            _lastLoggedState = st.Value.State;
         }
 
         if (st.Value.State == (int)LdacState.Streaming)

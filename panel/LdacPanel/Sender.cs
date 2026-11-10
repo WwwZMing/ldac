@@ -13,6 +13,7 @@ internal sealed class Sender
         new(@"\[pkt (\d+)\] peak=(\d+) frames=(\d+) len=(\d+)", RegexOptions.Compiled);
 
     private Process? _process;
+    private DateTime _startedAt;
 
     /// <summary>发送端自己写的日志路径（我们只读它，不打开）。</summary>
     public string LogPath { get; set; } = "";
@@ -43,8 +44,16 @@ internal sealed class Sender
             var process = new Process { StartInfo = info, EnableRaisingEvents = true };
             process.OutputDataReceived += (_, e) => OnLine(e.Data);
             process.ErrorDataReceived += (_, e) => OnLine(e.Data);
-            process.Exited += (_, _) => LastLine = $"发送端已退出 (code={SafeExitCode(process)})";
+            process.Exited += (_, _) =>
+            {
+                var code = SafeExitCode(process);
+                var uptime = _startedAt == default ? 0 : (DateTime.Now - _startedAt).TotalSeconds;
+                LastLine = $"发送端已退出 (code={code})";
+                PanelLog.Write($"sender: exited code={code} uptime={uptime:F1}s");
+            };
             if (!process.Start()) return false;
+            _startedAt = DateTime.Now;
+            PanelLog.Write($"sender: started pid={process.Id}");
             //  ⚠ 日志文件由 ldac-send.exe 自己创建并写入（--log）。
             //  面板绝不能先 fopen 它：StreamWriter 默认 FileShare.Read 会独占，
             //  子进程 fopen("w") 直接失败，结果就是"文件 0 字节"。
