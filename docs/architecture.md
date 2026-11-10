@@ -161,3 +161,12 @@ RTP 负载不含“帧数”头字节；SBC 与 LDAC 需要该字节。
 3. AVRCP 1.0 风格帧（`48 50 <vol>`，缺 packet type 与 param length）对端不应答。
 4. PSM 23 归系统 `BthAvrcpTg`；本驱动不实现 AVRCP（提交 `0e6b993`），端点音量与设备音量因此不同步。
 5. 设备绝对音量须由系统 A2DP 端点或设备按键设为 100%；该端点的滑块此后只做软件衰减。
+
+## 12. 发送端调度
+
+1. 采集、编码、发包三线程均以 MMCSS「Pro Audio」+ `AVRT_PRIORITY_CRITICAL` 运行；
+   `AvSetMmThreadCharacteristicsW` 失败时回退 `THREAD_PRIORITY_HIGHEST`。
+2. 发包节拍 5.33 ms（每包 2 帧 × 128 样本 / 48 kHz）。线程被挤开 20–40 ms 时，
+   空口速率掉到约 97 包/秒（开机后实测持续约 70 秒），之后恢复 187.5 包/秒。
+3. 诊断字段：`[pkt N] ... t=<毫秒> gap=<最近 100 包最大发包间隔，微秒>`。
+   `gap` 长期大于 20 ms 即调度问题，不是编码算力不足。

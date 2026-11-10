@@ -140,6 +140,10 @@ $ts = 'C:\Program Files\Wireshark\tshark.exe'
 
 脚本：`scripts\56-capture-aac.ps1`（等待设备在线 → 抓包 → 放音 → 收尾）。
 
+开机即发的复现：`scripts\61-boot-capture.ps1`（计划任务 `LdacBootCapture`，开机 +15 s 起、抓 300 s、SYSTEM、pwsh 7）。
+落盘 `log\boot\<时间戳>-usbpcapN.pcap` 与 `-monitor.txt`；monitor 每秒一行
+`sec state pkt peak pps kbps cpu sndcpu`，可直接看出空口包率与 CPU 抢占是否相关。
+
 ## 5. 排查顺序
 
 1. 状态：`IOCTL_LDAC_STATUS` 或服务 `status`，关注 state、codec、seid、媒体 MTU、包计数。
@@ -162,6 +166,7 @@ $ts = 'C:\Program Files\Wireshark\tshark.exe'
 | `Test-Path '\\.\LdacCtl'` 恒为 false | 设备对象不支持该判定 | 用 `[IO.File]::Open` 打开判断 |
 | publish 报 MSB4018 | 服务占用 `LdacPanel.exe` | 先停服务再 publish |
 | 同一首歌突然变小、滑块不改变音箱音量 | 端点 `hw=0`，AVRCP 未实现，音箱绝对音量停在低值 | 用系统 A2DP 端点或设备按键把音箱推到 100% |
+| 开机后约一分钟内声音断续/滋滋，之后自愈 | 发送端三线程默认优先级，开机后台任务把 5.33 ms 节拍挤开 20–40 ms，空口只剩 ~97 包/秒 | 三线程改 MMCSS「Pro Audio」+ `AVRT_PRIORITY_CRITICAL`（`host/ldac_send.c`）；日志 `gap=` 为最近 100 包最大发包间隔 |
 
 ## 7. 约定
 
